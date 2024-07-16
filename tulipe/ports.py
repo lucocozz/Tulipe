@@ -1,7 +1,7 @@
 import socket
+import json
 
 import psutil
-import json
 
 from tulipe import docker_port as dport
 from tulipe.PortInfo import PortInfo
@@ -50,8 +50,7 @@ def fetch(type_filter: str = "all"):
     return list(ports_info.values())
 
 
-
-
+@staticmethod
 def display_table(port_infos: list[PortInfo], port_filter=None):
     """Print the ports information in a table format."""
     port_infos.sort(key=lambda x: x.port)
@@ -62,12 +61,18 @@ def display_table(port_infos: list[PortInfo], port_filter=None):
             print(port_info.to_table())
 
 
+@staticmethod
 def display_json(port_infos: list[PortInfo], port_filter=None):
     """Print the ports information in a JSON format."""
-    ports = (port_info.to_dict() for port_info in port_infos if port_info.port == port_filter)
-    print(json.dumps(list(ports), indent=4))
+    ports = [
+        port_info.to_dict()
+        for port_info in port_infos
+        if not port_filter or port_info.port == port_filter
+    ]
+    print(json.dumps(ports if ports else None, indent=4))
 
 
+@staticmethod
 def display_csv(port_infos: list[PortInfo], port_filter=None):
     """Print the ports information in a CSV format."""
     for port_info in port_infos:

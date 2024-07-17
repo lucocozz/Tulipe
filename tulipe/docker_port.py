@@ -1,8 +1,13 @@
+import os
+
 import docker
 
 
 def fetch_active_ports() -> dict:
     """Get the ports of the running Docker containers."""
+    if os.getuid() != 0:
+        return {}
+
     client = docker.from_env()
     try:
         containers = client.containers.list(filters={"status": "running"})
@@ -14,4 +19,5 @@ def fetch_active_ports() -> dict:
     except docker.errors.DockerException as e:
         print(f"Error: {e}")
         active_ports = {}
+
     return active_ports

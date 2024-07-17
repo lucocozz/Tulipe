@@ -14,8 +14,8 @@ def main():
     """The main function of the Tulipe CLI."""
     cli = CLI()
     cli.parse()
-    port_infos = ports.fetch(cli.type)
-    ports.display(port_infos, cli.port, cli.service, cli.format)
+    port_infos = ports.fetch(cli.type, cli.port, cli.service)
+    ports.display(port_infos, cli.format)
 
 
 if __name__ == "__main__":

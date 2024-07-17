@@ -1,4 +1,3 @@
-import os
 import json
 import socket
 
@@ -17,25 +16,23 @@ def get_connection_type(conn):
 @staticmethod
 def get_service_name(pid, port, container_ports):
     """Get the name of the service that is using the port."""
-    service_name = "Unknown"
-    if pid:
-        try:
-            process = psutil.Process(pid)
-            service_name = process.name()
-            if service_name == "docker-proxy":
-                service_name = (
-                    f"docker-proxy:{container_ports.get(str(port), 'Unknown')}"
-                )
-        except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
-            print(f"Error: {e}")
+    try:
+        process = psutil.Process(pid)
+        service_name = process.name()
+        if service_name == "docker-proxy":
+            service_name = (
+                f"docker-proxy:{container_ports.get(str(port), 'Unknown')}"
+            )
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        service_name = "Unknown"
     return service_name
 
 
-def fetch(type_filter: str = "all", port_filter=None, service_filter=None):
+def fetch(type_filter:str="all", port_filter:int=None, service_filter:str=None, pid_filter:int=None):
     """Get the ports information of the system."""
     docker_ports = dport.fetch_active_ports()
     connections = [conn for conn in psutil.net_connections() if conn.laddr]
-    ports_info = {}
+    ports_info: dict[str, PortInfo] = {}
 
     for conn in connections:
 
@@ -45,10 +42,12 @@ def fetch(type_filter: str = "all", port_filter=None, service_filter=None):
         port = conn.laddr.port
         if port_filter and port != port_filter:
             continue
+        pid = conn.pid if conn.pid else "?"
+        if pid_filter and pid != pid_filter:
+            continue
         service_name = get_service_name(conn.pid, port, docker_ports)
         if service_filter and service_filter not in service_name:
             continue
-        pid = conn.pid if conn.pid else "?"
 
         hash_key = f"{port}:{pid}"
         if hash_key not in ports_info:

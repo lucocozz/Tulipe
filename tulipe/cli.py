@@ -22,6 +22,12 @@ class CLI:
             "-p", "--port", type=int, help="Show information about a specific port"
         )
         self._parser.add_argument(
+            "-s",
+            "--service",
+            type=str,
+            help="Show information about a specific service",
+        )
+        self._parser.add_argument(
             "-f",
             "--format",
             type=str,
@@ -32,6 +38,7 @@ class CLI:
         self.type = None
         self.port = None
         self.format = None
+        self.service = None
 
     def parse(self):
         """Parse the command-line arguments."""
@@ -39,3 +46,4 @@ class CLI:
         self.type = args.type
         self.port = args.port
         self.format = args.format
+        self.service = args.service

@@ -15,7 +15,7 @@ def main():
     cli = CLI()
     cli.parse()
     port_infos = ports.fetch(cli.type)
-    ports.display(port_infos, cli.port, cli.format)
+    ports.display(port_infos, cli.port, cli.service, cli.format)
 
 
 if __name__ == "__main__":

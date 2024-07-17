@@ -32,17 +32,19 @@ def get_service_name(pid, port, container_ports):
 
 def fetch(type_filter: str = "all"):
     """Get the ports information of the system."""
-    docker_ports = dport.fetch_active_ports(type_filter)
+    docker_ports = dport.fetch_active_ports()
     connections = [conn for conn in psutil.net_connections() if conn.laddr]
     ports_info = {}
 
     for conn in connections:
+        conn_type = get_connection_type(conn)
+        if type_filter != "all" and not conn_type.intersection({type_filter}):
+            continue
         port = conn.laddr.port
         pid = conn.pid if conn.pid else "?"
         hash_key = f"{port}:{pid}"
         if hash_key not in ports_info:
             service_name = get_service_name(conn.pid, port, docker_ports)
-            conn_type = get_connection_type(conn)
             ports_info[hash_key] = PortInfo(port, conn_type, pid, service_name)
         else:
             ports_info[hash_key].conn_types.update(conn_type)
@@ -51,41 +53,51 @@ def fetch(type_filter: str = "all"):
 
 
 @staticmethod
-def display_table(port_infos: list[PortInfo], port_filter=None):
+def display_table(port_infos: list[PortInfo], port_filter=None, service_filter=None):
     """Print the ports information in a table format."""
     port_infos.sort(key=lambda x: x.port)
     print(f"{'Port':<8} {'Type':<8} {'PID':>8} {'Service':<20}")
     print("=" * 40)
     for port_info in port_infos:
-        if not port_filter or port_info.port == port_filter:
+        if (not port_filter or port_info.port == port_filter) and (
+            not service_filter or service_filter in port_info.service_name
+        ):
             print(port_info.to_table())
 
 
 @staticmethod
-def display_json(port_infos: list[PortInfo], port_filter=None):
+def display_json(port_infos: list[PortInfo], port_filter=None, service_filter=None):
     """Print the ports information in a JSON format."""
     ports = [
         port_info.to_dict()
         for port_info in port_infos
-        if not port_filter or port_info.port == port_filter
+        if (not port_filter or port_info.port == port_filter)
+        and (not service_filter or service_filter in port_info.service_name)
     ]
     print(json.dumps(ports if ports else None, indent=4))
 
 
 @staticmethod
-def display_csv(port_infos: list[PortInfo], port_filter=None):
+def display_csv(port_infos: list[PortInfo], port_filter=None, service_filter=None):
     """Print the ports information in a CSV format."""
     for port_info in port_infos:
-        if not port_filter or port_info.port == port_filter:
+        if (not port_filter or port_info.port == port_filter) and (
+            not service_filter or service_filter in port_info.service_name
+        ):
             print(port_info.to_csv())
 
 
-def display(port_infos: list[PortInfo], port_filter=None, print_format="table"):
+def display(
+    port_infos: list[PortInfo],
+    port_filter=None,
+    service_filter=None,
+    print_format="table",
+):
     """Print the ports information."""
     port_infos.sort(key=lambda x: x.port)
     if print_format == "json":
-        display_json(port_infos, port_filter)
+        display_json(port_infos, port_filter, service_filter)
     elif print_format == "csv":
-        display_csv(port_infos, port_filter)
+        display_csv(port_infos, port_filter, service_filter)
     else:
-        display_table(port_infos, port_filter)
+        display_table(port_infos, port_filter, service_filter)

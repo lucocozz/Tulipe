@@ -1,7 +1,7 @@
 import docker
 
 
-def fetch_active_ports(type_filter: str = "all") -> dict:
+def fetch_active_ports() -> dict:
     """Get the ports of the running Docker containers."""
     client = docker.from_env()
     try:
@@ -10,7 +10,6 @@ def fetch_active_ports(type_filter: str = "all") -> dict:
             port.split('/')[0]: container.name
             for container in containers
             for port in container.attrs["NetworkSettings"]["Ports"]
-            if type_filter == "all" or port.endswith(f'/{type_filter}')
         }
     except docker.errors.DockerException as e:
         print(f"Error: {e}")

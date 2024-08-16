@@ -1,14 +1,16 @@
 import argparse
 
+from tulipe import __version__
+
 
 class CLI:
     """The CLI class for Tulipe."""
 
     def __init__(self):
         """Initialize the CLI class."""
-        self._parser = argparse.ArgumentParser()
+        self._parser = argparse.ArgumentParser(prog="tulipe")
         self._parser.add_argument(
-            "--version", action="version", version="Tulipe v0.1"
+            "-v", "--version", action="version", version=f"Tulipe v{__version__}"
         )
         self._parser.add_argument(
             "-t",
@@ -38,11 +40,18 @@ class CLI:
             default="table",
             help="Output format",
         )
-        self.type = None
-        self.port = None
-        self.format = None
-        self.service = None
-        self.pid = None
+        self._parser.add_argument(
+            "-S",
+            "--status",
+            action="store_true",
+            help="Show the status of the port",
+        )
+        self.type: str
+        self.format: str
+        self.port: int | None
+        self.service: str | None
+        self.pid: int | None
+        self.status: bool
 
     def parse(self):
         """Parse the command-line arguments."""
@@ -52,3 +61,4 @@ class CLI:
         self.format = args.format
         self.service = args.service
         self.pid = args.pid
+        self.status = args.status

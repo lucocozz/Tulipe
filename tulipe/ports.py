@@ -2,42 +2,50 @@ import json
 import socket
 
 import psutil
+from colored import Back, Style
 
 from tulipe.PortInfo import PortInfo
 from tulipe import docker_port as dport
 
 
 @staticmethod
-def get_connection_type(conn):
+def get_connection_type(conn_type, conn_family):
     """Get the connection type (TCP/UDP) of the connection."""
-    return {"tcp"} if conn.type == socket.SOCK_STREAM else {"udp"}
+    conn = "tcp" if conn_type == socket.SOCK_STREAM else "udp"
+    if conn_family == socket.AF_INET6:
+        conn += "6"
+    return conn
 
 
 @staticmethod
-def get_service_name(pid, port, container_ports):
+def get_service(pid: int | None, port: int, container_ports: dict):
     """Get the name of the service that is using the port."""
+    if pid is None:
+        return "unknown"
     try:
         process = psutil.Process(pid)
-        service_name = process.name()
-        if service_name == "docker-proxy":
-            service_name = (
-                f"docker-proxy:{container_ports.get(str(port), 'Unknown')}"
-            )
+        service = process.name()
+        if service == "docker-proxy":
+            service = f"docker:{container_ports.get(str(port), 'unknown')}"
     except (psutil.NoSuchProcess, psutil.AccessDenied):
-        service_name = "Unknown"
-    return service_name
+        pass
+    return service
 
 
-def fetch(type_filter:str="all", port_filter:int=None, service_filter:str=None, pid_filter:int=None):
+def fetch(
+    type_filter: str = "all",
+    port_filter: int | None = None,
+    service_filter: str | None = None,
+    pid_filter: int | None = None,
+):
     """Get the ports information of the system."""
     docker_ports = dport.fetch_active_ports()
     connections = [conn for conn in psutil.net_connections() if conn.laddr]
-    ports_info: dict[str, PortInfo] = {}
+    port_infos: dict[str, PortInfo] = {}
 
     for conn in connections:
-
-        conn_type = get_connection_type(conn)
-        if type_filter != "all" and not conn_type.intersection({type_filter}):
+        conn_type = get_connection_type(conn.type, conn.family)
+        if type_filter != "all" and conn_type != type_filter:
             continue
         port = conn.laddr.port
         if port_filter and port != port_filter:
@@ -45,27 +53,36 @@ def fetch(type_filter:str="all", port_filter:int=None, service_filter:str=None, 
         pid = conn.pid if conn.pid else "?"
         if pid_filter and pid != pid_filter:
             continue
-        service_name = get_service_name(conn.pid, port, docker_ports)
-        if service_filter and service_filter not in service_name:
+        service = get_service(conn.pid, port, docker_ports)
+        if service_filter and service_filter not in service:
             continue
+        hash_key = f"{port}:{conn_type}"
+        if hash_key not in port_infos:
+            port_infos[hash_key] = PortInfo(port, conn_type, pid, service, conn.status)
 
-        hash_key = f"{port}:{pid}"
-        if hash_key not in ports_info:
-            ports_info[hash_key] = PortInfo(port, conn_type, pid, service_name)
-        else:
-            ports_info[hash_key].conn_types.update(conn_type)
+    return sorted(list(port_infos.values()), key=lambda x: x.port)
 
-    return list(ports_info.values())
 
 
 @staticmethod
-def display_table(port_infos: list[PortInfo]):
+def __get_header(status: bool) -> str:
+    header = f"{'Port':>5} {'Proto':<6}"
+    if status:
+        header += f" {'Status':<15}"
+    header += f" {'PID':>8} {'Service':<25}"
+    return header
+
+
+@staticmethod
+def display_table(port_infos: list[PortInfo], status: bool):
     """Print the ports information in a table format."""
-    port_infos.sort(key=lambda x: x.port)
-    print(f"{'Port':<8} {'Type':<8} {'PID':>8} {'Service':<20}")
-    print("=" * 40)
+    header = __get_header(status)
+    delimiter_len = len(header)
+    print(header)
+    print("=" * delimiter_len)
     for port_info in port_infos:
-        print(port_info.to_table())
+        print(f"{Style.underline_color('black')}{port_info.to_table(has_status=status)}{Style.RESET}")
+    print("=" * delimiter_len)
 
 
 @staticmethod
@@ -85,12 +102,12 @@ def display_csv(port_infos: list[PortInfo]):
 def display(
     port_infos: list[PortInfo],
     print_format="table",
+    status=False,
 ):
     """Print the ports information."""
-    port_infos.sort(key=lambda x: x.port)
     if print_format == "json":
         display_json(port_infos)
     elif print_format == "csv":
         display_csv(port_infos)
     else:
-        display_table(port_infos)
+        display_table(port_infos, status)

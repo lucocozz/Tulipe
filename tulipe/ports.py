@@ -2,9 +2,9 @@ import json
 import socket
 
 import psutil
-from colored import Back, Style
+from colored import Style
 
-from tulipe.PortInfo import PortInfo
+from tulipe.types.PortInfo import PortInfo
 from tulipe import docker_port as dport
 
 
@@ -44,21 +44,25 @@ def fetch(
     port_infos: dict[str, PortInfo] = {}
 
     for conn in connections:
-        conn_type = get_connection_type(conn.type, conn.family)
-        if type_filter != "all" and conn_type != type_filter:
+        # conn_type = get_connection_type(conn.type, conn.family)
+        conn_type = "tcp" if conn.type == socket.SOCK_STREAM else "udp"
+        ip_version = "6" if conn.family == socket.AF_INET6 else "4"
+
+        if type_filter != "all" and type_filter not in conn_type:
             continue
         port = conn.laddr.port
         if port_filter and port != port_filter:
             continue
-        pid = conn.pid if conn.pid else "?"
-        if pid_filter and pid != pid_filter:
+        if pid_filter and conn.pid != pid_filter:
             continue
         service = get_service(conn.pid, port, docker_ports)
         if service_filter and service_filter not in service:
             continue
+
         hash_key = f"{port}:{conn_type}"
         if hash_key not in port_infos:
-            port_infos[hash_key] = PortInfo(port, conn_type, pid, service, conn.status)
+            status = conn.status if conn.status != "NONE" else None
+            port_infos[hash_key] = PortInfo(port, conn_type, ip_version, conn.pid, service, status)
 
     return sorted(list(port_infos.values()), key=lambda x: x.port)
 
@@ -66,7 +70,7 @@ def fetch(
 
 @staticmethod
 def __get_header(status: bool) -> str:
-    header = f"{'Port':>5} {'Proto':<6}"
+    header = f"{'Port':>5} {'Protocol'}"
     if status:
         header += f" {'Status':<15}"
     header += f" {'PID':>8} {'Service':<25}"
